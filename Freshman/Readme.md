@@ -9,7 +9,7 @@ In this project, I am going to utilize google api to help user to know how to **
 Thus, we probide the above information to user to help them determine which is the best way.
 ## System Flowchart
 ![alt text](image-2.png)
-## Used S
+## Used Skill
 The following are the langauage we use in this project
 * Ptython
 * Google API
