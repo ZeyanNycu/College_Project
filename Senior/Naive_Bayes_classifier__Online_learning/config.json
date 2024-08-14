@@ -1,0 +1,7 @@
+{
+    "mode":"continous",
+    "train_dataset_path":"/media/user/data1/zeyan/2024_Fall_Nycu/Machine_Learning/hw2/dataset/train-images.idx3-ubyte_",
+    "train_label_path":"/media/user/data1/zeyan/2024_Fall_Nycu/Machine_Learning/hw2/dataset/train-labels.idx1-ubyte_",
+    "test_dataset_path":"/media/user/data1/zeyan/2024_Fall_Nycu/Machine_Learning/hw2/dataset/t10k-images.idx3-ubyte_",
+    "test_label_path":"/media/user/data1/zeyan/2024_Fall_Nycu/Machine_Learning/hw2/dataset/t10k-labels.idx1-ubyte_"
+}

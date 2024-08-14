@@ -1,0 +1,7 @@
+{
+    "lamda":10000,
+    "n":2,
+    "datapoints_path":"testfile.txt",
+    "function":"steepest",
+    "learning_rate":0.000001
+}
